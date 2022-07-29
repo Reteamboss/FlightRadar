@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_LoginWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(513, 298)
+        MainWindow.setFixedSize(513, 298)
         MainWindow.setAnimated(False)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -33,6 +33,7 @@ class Ui_LoginWindow(object):
         self.gridLayout.addWidget(self.lineEdit_2, 1, 1, 1, 1)
         self.lineEdit = QtWidgets.QLineEdit(self.gridLayoutWidget)
         self.lineEdit.setObjectName("lineEdit")
+        self.lineEdit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.gridLayout.addWidget(self.lineEdit, 2, 1, 1, 1)
         self.label_3 = QtWidgets.QLabel(self.gridLayoutWidget)
         self.label_3.setObjectName("label_3")
@@ -89,7 +90,7 @@ class Ui_LoginWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MoneyControl"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Login"))
         self.label_2.setText(_translate("MainWindow", "Login:"))
         self.label_3.setText(_translate("MainWindow", "Password:"))
         self.label.setText(_translate("MainWindow", "Welcome"))

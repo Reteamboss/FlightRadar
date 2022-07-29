@@ -8,16 +8,17 @@ import time
 import threading
 import sched
 import pandas as pd
-from userinfo import LOGIN,PASSWORD
+from userinfo import LOGIN,PASSWORD,API_KEY,API_HOST
 import sqlite3 as sq
 from opsk import Ui_MainWindow
-from PyQt5.QtWidgets import QApplication, QWidget,QHBoxLayout,QVBoxLayout,QMainWindow
+from PyQt5.QtWidgets import QApplication, QWidget,QHBoxLayout,QVBoxLayout,QMainWindow,QAction
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from folium.plugins import MousePosition, LocateControl
 from PyQt5 import QtWidgets, QtSql, QtCore, QtGui
 from interlogindesign import Ui_LoginWindow
 from rfdesign import Ui_RegFormWindow
 from fildesign import Ui_Dialog
+from usi import Ui_InfoWindow
 from PyQt5.QtSql import QSqlTableModel
 
 
@@ -27,7 +28,9 @@ class MainWindow(QtWidgets.QMainWindow):
         super(MainWindow, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.update_button = True
         self.ui.pushButton_11.clicked.connect(QtWidgets.qApp.quit)
+        # self.ui.pushButton_11.clicked.connect(self.stop_function)
         self.ui.pushButton_4.clicked.connect(self.get_info)
         self.ui.pushButton_4.clicked.connect(self.show_all)
         # self.ui.pushButton_4.clicked.connect(self.update_all_info)
@@ -36,33 +39,69 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.tableView.setMouseTracking(True)
         self.ui.tableView.clicked.connect(self.on_click_left_button)
         self.ui.tableView.clicked.connect(self.callsign_plane)
-        self.ui.pushButton.clicked.connect(self.get_coordinates)
         self.ui.pushButton_2.clicked.connect(self.show_by_category)
         self.web_map = MainWindow.create_map(self)
         self.ui.verticalLayout.addWidget(self.web_map)
+        self.ui.actionDelete_account_2.triggered.connect(self.delete_account)
+        self.ui.actionSign_Out.triggered.connect(self.sign_out)
+        self.ui.actionAbout_User.triggered.connect(self.info_user)
+        self.ui.pushButton.clicked.connect(self.create_map)
+        self.ui.pushButton.clicked.connect(self.show_all)
 
 
 
-    def update_all_info(self):
-        threading.Timer(5.0, self.update_all_info).start()  # Перезапуск через 5 секунд
-        # window.get_coordinates()
-        df = window.get_coordinates()
-        # window.update_marker(df)
+    # def update_all_info(self):
+    #     if self.update_button == True:
+    #         threading.Timer(5.0, self.update_all_info).start()  # Перезапуск через 5 секунд
+    #         # window.get_coordinates()
+    #         df = window.get_coordinates()
+    #         # window.update_marker(df)
 
     def create_web_map(self):
-        web_map = folium.Map(zoom_start=12, location=[48.8670, 2.4586], tiles="Stamen Terrain")
+        # info_user = MainWindow.get_info_about_user(self)
+        # coordinates = [info_user['latitude'],info_user['longitude']]
+        coordinates = [48.856662, 2.351556]
+        web_map = folium.Map(zoom_start=12, location=coordinates, tiles="Stamen Terrain")
         return web_map
 
+    def print_df(self):
+        df = window.get_coordinates()
+        planes = []
+        info_plane = set()
+        for Callsign, Country, Timeposition, Lastcontact, Longitude, Latitude in df.items():
+            info_plane.update(Callsign, Country, Timeposition, Lastcontact, Longitude, Latitude)
+            print(info_plane)
 
 
+
+    # def stop_function(self):
+    #     update_button = False
+
+
+
+    def delete_account(self):
+        con1.open()
+        result = login_window.sign_in()
+        cur.execute(f"DELETE FROM users WHERE username = '{result}'")
+        con.commit()
+        window.close()
+        login_window.show()
+
+        login_window.ui.label_4.setText("<font color=green>Аккаунт успешно удален!</font>")
+
+    def sign_out(self):
+        window.close()
+        login_window.show()
 
 
 
     def create_map(self):
         web_map = MainWindow.create_web_map(self)
+        # df = MainWindow.get_coordinates(self)
+        # myicon = folium.features.CustomIcon("icons/airplane-icon.png", icon_size=(48,48))
 
         cur.execute("SELECT callsign,origin_country,time_position,last_contact,longitude,latitude FROM "
-                    "planes WHERE (longitude or latitude) != 'None'")
+                    "planes WHERE (longitude or latitude) != 'None' and on_ground != '1'")
         planes = cur.fetchall()
         for info_plane in planes:
             longitude = info_plane[4]
@@ -70,11 +109,12 @@ class MainWindow(QtWidgets.QMainWindow):
             coordinates = [latitude, longitude]
             tooltip = str(info_plane[0]) + '\n' + str(info_plane[1])
             popup = "Callsign: {0} \nCountry: {1} \nTime position: {2} \n, Last contact: {3} \n Longitude: {4} \n" \
-                    "Latitude: {5} ".format(info_plane[0],info_plane[1],info_plane[2],info_plane[3],info_plane[4],info_plane[5])
+                    "Latitude: {5} ".format(info_plane[0],info_plane[1],time.ctime(info_plane[2]),time.ctime(info_plane[3]),info_plane[4],info_plane[5])
             folium.Marker(location=coordinates,tooltip=tooltip,popup=popup, icon=folium.Icon(icon="plane", color='green',draggable=True)).add_to(web_map)
-        data = io.BytesIO()
 
-        # res = m.get_bounds()
+        data = io.BytesIO()
+        custom_pane = folium.map.CustomPane("Markers", z_index=625, pointer_events=True)
+        web_map.add_child(custom_pane)
         web_map.add_child(folium.LatLngPopup())
         formatter = "function(num) {return L.Util.formatNum(num, 5);};"
         mouse_position = MousePosition(
@@ -132,7 +172,7 @@ class MainWindow(QtWidgets.QMainWindow):
         web_view.setHtml(data.getvalue().decode())
 
     def get_info(self):
-        api = OpenSkyApi("Irbis07","6pwhh4ceR" )
+        api = OpenSkyApi("LOGIN","PASSWORD" )
         states = api.get_states()
         # for s in states.states:
         #     print("(%r, %r, %r, %r)" % (s.longitude, s.latitude, s.baro_altitude, s.velocity))
@@ -149,18 +189,52 @@ class MainWindow(QtWidgets.QMainWindow):
                     "longitude ,latitude ,baro_altitude ,on_ground ,velocity ,true_track ,vertical_rate ,sensors ,"
                     "geo_altitude ,squawk ,spi ,position_source) VALUES ( ?, ?, ?, ?, ?,?,?,?,?,?,?,?,?,?,?,?,?);",to_db)
         con.commit()
+    #
+    # def get_coordinates(self):
+    #     api = OpenSkyApi(LOGIN, PASSWORD)
+    #     # bbox = (min latitude, max latitude, min longitude, max longitude)
+    #     states = api.get_states(bbox=(47.0500, 50.2635, -1.9358, 6.6773))
+    #     to_db2 = []
+    #     for s in states.states:
+    #         info_tuple = [s.callsign,s.origin_country,time.ctime(s.time_position), time.ctime(s.last_contact),s.longitude, s.latitude]
+    #         to_db2.append(info_tuple)
+    #     df = pd.DataFrame(to_db2, columns =["Callsign", "Country", "Timeposition", "Lastcontact","Longitude","Latitude"])
+    #     return df
 
-    def get_coordinates(self):
-        api = OpenSkyApi(LOGIN, PASSWORD)
-        # bbox = (min latitude, max latitude, min longitude, max longitude)
-        states = api.get_states(bbox=(47.0500, 50.2635, -1.9358, 6.6773))
-        to_db2 = []
-        for s in states.states:
-            info_tuple = [s.callsign,s.origin_country,s.time_position, s.last_contact,s.longitude, s.latitude]
-            to_db2.append(info_tuple)
-        df = pd.DataFrame(to_db2, columns =["Callsign", "Country", "Timeposition", "Lastcontact","Longitude","Latitude"])
-        print(df)
-        return df
+    def get_info_about_user(self):
+
+        url = "https://ip-geolocation-ipwhois-io.p.rapidapi.com/json/"
+
+        headers = {
+            "X-RapidAPI-Key": API_KEY,
+            "X-RapidAPI-Host": API_HOST
+        }
+
+        response = req.request("GET", url, headers=headers)
+
+        return response.json()
+
+    def info_user(self):
+        more_info = window.get_info_about_user()
+        username = login_window.sign_in()
+        user_info.show()
+        cur.execute(f"SELECT * FROM users WHERE username = '{username}'")
+        main_info = cur.fetchall()
+
+        user_info.ui.label_3.setText(main_info[0][0])
+        user_info.ui.label_30.setText(main_info[0][1])
+        user_info.ui.label_29.setText(main_info[0][2])
+        user_info.ui.label_28.setText(main_info[0][3])
+        user_info.ui.label_27.setText(main_info[0][4])
+
+        user_info.ui.label_9.setText(str(more_info['ip']))
+        user_info.ui.label_22.setText(str(more_info['continent']))
+        user_info.ui.label_20.setText(str(more_info['country']))
+        user_info.ui.label_23.setText(str(more_info['region']))
+        user_info.ui.label_24.setText(str(more_info['city']))
+        user_info.ui.label_25.setText(str(more_info['longitude']))
+        user_info.ui.label_26.setText(str(more_info['latitude']))
+
 
     def show_by_category(self):
         category = self.ui.lineEdit_2.text()
@@ -199,6 +273,21 @@ class MainWindow(QtWidgets.QMainWindow):
     def show_marker(self):
         pass
 
+    def contextMenuEvent(self, e):
+
+        self.ui.tableView.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        addgrup_action = QAction(u"Set Favourites", self)
+        addgrup_action.triggered.connect(self.set_favourites)
+        self.ui.tableView.addAction(addgrup_action)
+
+    def set_favourites(self,index):
+        con1.open()
+        result = window.callsign_plane()
+        favourites = "True"
+        sql_update_query = """UPDATE planes SET favourites = '{}' WHERE callsign = '{}'""".format(favourites,result)
+        cur.execute(sql_update_query)
+        con1.commit()
+
     def set_column_tableview_width(self):
         tv = self.ui.tableView
         tv.setModel(stm)
@@ -226,6 +315,7 @@ class MainWindow(QtWidgets.QMainWindow):
         stm.setHeaderData(2, QtCore.Qt.Horizontal, 'Country')
         stm.setHeaderData(5, QtCore.Qt.Horizontal, 'Longitude')
         stm.setHeaderData(6, QtCore.Qt.Horizontal, 'Latitude')
+        stm.setHeaderData(7, QtCore.Qt.Horizontal, 'Favourites')
 
     def on_click_left_button(self, index):
         con1.open()
@@ -292,12 +382,15 @@ class RegistrationForm(QtWidgets.QMainWindow):
         cur.execute(f"SELECT username, password FROM users WHERE username = '{user.username}' AND password = '{user.password}'")
 
         if cur.fetchone() is None:
-            cur.execute("INSERT OR IGNORE INTO users VALUES (?,?,?,?,?)",
-                        (user.firstname, user.lastname, user.username, user.password, user.email))
-            con.commit()
-            self.ui.label_7.setText("<font color=green>Вы успешно зарегестрировались!</font>")
-            time.sleep(1)
-            RegistrationForm.back_login_window(self)
+            if user.firstname and user.lastname and user.username and user.password and user.email != "":
+                cur.execute("INSERT OR IGNORE INTO users VALUES (?,?,?,?,?)",
+                            (user.firstname, user.lastname, user.username, user.password, user.email))
+                con.commit()
+                self.ui.label_7.setText("<font color=green>Вы успешно зарегестрировались!</font>")
+                time.sleep(1)
+                RegistrationForm.back_login_window(self)
+            else:
+                self.ui.label_7.setText("<font color=red>Заполните все поля пожалуйста!</font>")
         else:
             self.ui.label_7.setText("<font color=red>Такой логин уже существует!</font>")
 
@@ -318,7 +411,7 @@ class FilterWindow(QtWidgets.QDialog):
         self.ui.buttonBox.rejected.connect(self.back_main_window)
 
 
-        def combobox_info():  # функция для добавления информации о городах и почтовых зип в комбобокс
+        def combobox_info():
             cur.execute(f"SELECT origin_country FROM planes")
             self.sql = cur.fetchall()
             return self.sql
@@ -330,79 +423,53 @@ class FilterWindow(QtWidgets.QDialog):
         self.ui.comboBox.addItems(self.country)
 
     def choose_callsign(self):
+        self.ui.comboBox_2.clear()
         self.choose_country = self.ui.comboBox.currentText()
         cur.execute("SELECT callsign FROM planes WHERE origin_country = '{}'".format(self.choose_country))
         self.sql_callsign = cur.fetchall()
-        self.sql_callsign = set()
+        self.callsign = set()
         for i in self.sql_callsign:
-            self.sql_callsign.update(i)
-        self.ui.comboBox_2.addItems(self.sql_callsign)
+            self.callsign.update(i)
+        self.ui.comboBox_2.addItems(self.callsign)
 
     def show_by_filter(self):
-        filter_window.close()
-        callsign = self.ui.comboBox_2.currentText()
-        window.ui.tableView.setModel(stm)
-        con1.open()
-        stm.setTable('planes')
-        # try:
-        #     dist_var = float(self.ui.lineEdit.text())
-        # except:
-        #     "ValueError: could not convert string to float: ''"
+        if self.ui.checkBox.isChecked():
+            tv = window.ui.tableView
+            tv.setModel(stm)
+            con1.open()
+            stm.setTable('planes')
+            categoryfilter = f"favourites = 'True'"
+            stm.setFilter(categoryfilter)
+            stm.select()
+            window.set_column_tableview_width()
+            count = stm.rowCount()
+            window.ui.label_35.setText('<font color=green>Успешно! Отображено {} записей</font>'.format(count))
 
-        categoryfilter = f" callsign = '{callsign}'"
-        stm.setFilter(categoryfilter)
-        stm.select()
-        window.set_column_tableview_width()
-        count = stm.rowCount()
-        con1.close()
-        window.ui.label_35.setText('<font color=green>Успешно! Отображено {} записей</font>'.format(count))
+
+        else:
+            filter_window.close()
+            callsign = self.ui.comboBox_2.currentText()
+            window.ui.tableView.setModel(stm)
+            con1.open()
+            stm.setTable('planes')
+            # try:
+            #     dist_var = float(self.ui.lineEdit.text())
+            # except:
+            #     "ValueError: could not convert string to float: ''"
+
+            categoryfilter = f" callsign = '{callsign}'"
+            stm.setFilter(categoryfilter)
+            stm.select()
+            window.set_column_tableview_width()
+            count = stm.rowCount()
+            con1.close()
+            window.ui.label_35.setText('<font color=green>Успешно! Отображено {} записей</font>'.format(count))
 
 
 
     def back_main_window(self):
         filter_window.close()
         window.show()
-
-    # def zip_area(self):
-    #     con1.open()
-    #     cur.execute("SELECT zip FROM maininfo")
-    #     zips = cur.fetchall()
-    #     zip_db = []
-    #     zip_set = set(zips)
-    #     zip1 = filter_window.get_zip()
-    #     dist_var = float(self.ui.lineEdit.text())
-    #     for zip2 in zip_set:
-    #         zip_codes = util.read_zip_all()
-    #         rezult = zip_app.process_dist(zip_codes, zip1, zip2[0])
-    #         try:
-    #             if rezult <= dist_var:
-    #                 zip_db.append(zip2[0])
-    #             print(rezult)
-    #             print(zip_db)
-    #         except:
-    #             "TypeError: '<=' not supported between instances of 'NoneType' and 'float'"
-    #     return zip_db
-
-
-
-        # zip_codes = util.read_zip_all()
-        # rezult = zip_app.process_dist(zip_codes, zip1, zip2)
-        # print(zip_list)
-
-    # def calculate_distance_area(self):
-    #     zip1 = self.ui.comboBox_3.currentText()
-    #     distance_area = self.ui.lineEdit.text()
-    #     cur.execute("SELECT zip_code FROM zip_codes")
-    #     zip_result2 = cur.fetchall()
-    #     zip2 = []
-    #     true_zip = []
-    #     for i in zip_result2:
-    #         zip2.append(i)
-    #     for x in zip2:
-    #         distance = zip_app.process_dist(zip1,zip2)
-    #         if distance < distance_area:
-    #             true_zip.append(x)
-    #     print(true_zip)
 
 
 class LoginWindow(QtWidgets.QMainWindow):
@@ -423,6 +490,7 @@ class LoginWindow(QtWidgets.QMainWindow):
             self.ui.label_4.setText("<font color=red>Неверный логин и/или пароль!</font>")
         else:
             self.ui.label_4.setText("<font color=green>Успешно!Добро пожаловать!</font>")
+            self.ui.label_4.setText("<font color=green> </font>")
             window.show()
             cur.execute(f"SELECT firstname, lastname FROM users WHERE username = '{username}' AND password = '{password}'")
             name = cur.fetchone()
@@ -433,6 +501,18 @@ class LoginWindow(QtWidgets.QMainWindow):
     def registration(self):
         login_window.close()
         reg_form.show()
+
+class InfoWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super(InfoWindow, self).__init__()
+        self.ui = Ui_InfoWindow()
+        self.ui.setupUi(self)
+        self.ui.pushButton.clicked.connect(self.back_main_window)
+
+    def back_main_window(self):
+        user_info.close()
+        window.show()
+
 
 with sq.connect("flights.db") as con:
     cur = con.cursor()
@@ -454,7 +534,8 @@ with sq.connect("flights.db") as con:
         geo_altitude REAL,
         squawk TEXT,
         spi NUMERIC,
-        position_source INTEGER)""")
+        position_source INTEGER,
+        favourites VARCHAR)""")
 
 
     cur.execute("""CREATE TABLE IF NOT EXISTS users (
@@ -473,17 +554,20 @@ with sq.connect("flights.db") as con:
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    s = sched.scheduler(time.time, time.sleep)
-    s.run()
+    # s = sched.scheduler(time.time, time.sleep)
+    # s.run()
+
     web_view = QWebEngineView()
     # app.setStyleSheet('''
     #     QWidget {
     #         font-size: 35px;''')
     filter_window = FilterWindow()
+    # window.update_all_info()
+    sign_in = False
     window = MainWindow()
-    window.update_all_info()
     login_window = LoginWindow()
     reg_form = RegistrationForm()
+    user_info = InfoWindow()
     con1 = QtSql.QSqlDatabase.addDatabase('QSQLITE')
     con1.setDatabaseName('flights.db')
     con1.open()
