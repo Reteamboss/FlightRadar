@@ -1,0 +1,8 @@
+
+PyQt5-stubs==5.15.6.0
+PyQtWebEngine-Qt5==5.15.2
+PyQTWebEngine==5.15.6
+pandas==1.4.3
+PyQt5==5.15.7
+folium==0.12.1.post1
+requests==2.28.1
