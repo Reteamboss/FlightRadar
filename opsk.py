@@ -249,7 +249,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "FlightRadar"))
         self.label_5.setText(_translate("MainWindow", "Time Position"))
         self.label_2.setText(_translate("MainWindow", "Icao24"))
         self.label_6.setText(_translate("MainWindow", "Origin Country"))
