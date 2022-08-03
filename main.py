@@ -213,8 +213,8 @@ class MainWindow(QtWidgets.QMainWindow):
         url = "https://ip-geolocation-ipwhois-io.p.rapidapi.com/json/"
 
         headers = {
-            "X-RapidAPI-Key": API_KEY,
-            "X-RapidAPI-Host": API_HOST
+            "X-RapidAPI-Key":"72a9642f62msha40eb2a29b7498dp1c8666jsn86b05775c6ac",
+            "X-RapidAPI-Host": "ip-geolocation-ipwhois-io.p.rapidapi.com"
         }
 
         response = req.request("GET", url, headers=headers)
